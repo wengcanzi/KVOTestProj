@@ -113,7 +113,7 @@ static void cz_kvoSetter(id self, SEL selector, id value) {
         id observer = mapTable.observer;
         if (observer) {
             if ([mapTable.key isEqualToString:getterString] && mapTable.block) {
-                mapTable.block(self, NSStringFromSelector(selector), oldValue, value);
+                mapTable.block(NSStringFromSelector(selector), oldValue, value);
             }
             else if ([mapTable.key isEqualToString:getterString] && mapTable.action) {
                 //屏蔽内存警告
