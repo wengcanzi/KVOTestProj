@@ -19,12 +19,12 @@ static NSString *cz_KVOClassPrefix = @"cz_KVONotifying_";//系统自动中间类
 @implementation NSObject (KVOExtension)
 
 #pragma mark -- 字符串裁剪
+//c语言的静态函数（作用类似于类方法）
 static NSString * cz_getterForSetter(SEL setter) {
     NSString *setterString = NSStringFromSelector(setter);
     if (![setterString hasPrefix:@"set"]) {
         return nil;
     }
-    
     return getterString(setterString);
 }
 
@@ -69,7 +69,6 @@ static NSString * getterString(NSString *setterString){
     return kvoClass;
 }
 
-//静态函数（作用类似于类方法）
 static Class cz_kvoClass(id self, SEL selector) {
     return class_getSuperclass(object_getClass(self));
 }
@@ -111,19 +110,19 @@ static void cz_kvoSetter(id self, SEL selector, id value) {
     [observers enumerateObjectsUsingBlock:^(CZKVOItem * _Nonnull mapTable, NSUInteger idx, BOOL * _Nonnull stop) {
         
         id observer = mapTable.observer;
-        if (observer) {
-            if ([mapTable.key isEqualToString:getterString] && mapTable.block) {
+        if (observer && [mapTable.key isEqualToString:getterString]) {
+            if (mapTable.block) {
                 mapTable.block(NSStringFromSelector(selector), oldValue, value);
             }
-            else if ([mapTable.key isEqualToString:getterString] && mapTable.action) {
+            else if (mapTable.action) {
                 //屏蔽内存警告
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Warc-performSelector-leaks"
+//#pragma clang diagnostic push
+//#pragma clang diagnostic ignored "-Warc-performSelector-leaks"
                 //系统方法，只能返回1到2个参数
 //                    [observer performSelector:mapTable.action withObject:oldValue withObject:value];
+//#pragma clang diagnostic pop
                 //自定义的返回多个参数的performSelector
                 [observer performSelector:mapTable.action withObjects:@[oldValue,value,mapTable.key]];
-#pragma clang diagnostic pop
             }
         }
     }];
@@ -133,7 +132,7 @@ static void cz_kvoSetter(id self, SEL selector, id value) {
     //判断当前类是否是KVO子类，如果不是则创建，并设置其isa指针。
     /*
      通过self调用的步骤，需要在这里执行完
-     因为object_setClass会交换sisa指针，此时的selfb已经不是原先的self，分开执行会因为使用同一个self指向的类型而失效
+     因为object_setClass会交换isa指针，此时的self已经不是原先的self，分开执行会因为使用同一个self指向的类型而失效
      */
     NSString *kvoClassName = NSStringFromClass(kvoClass);
     if (![kvoClassName hasPrefix:cz_KVOClassPrefix]) {
@@ -160,7 +159,7 @@ static void cz_kvoSetter(id self, SEL selector, id value) {
     //判断当前类是否是KVO子类，如果不是则创建，并设置其isa指针。
     /*
      通过self调用的步骤，需要在这里执行完
-     因为object_setClass会交换sisa指针，此时的selfb已经不是原先的self，分开执行会因为使用同一个self指向的类型而失效
+     因为object_setClass会交换isa指针，此时的self已经不是原先的self，分开执行会因为使用同一个self指向的类型而失效
      */
     NSString *kvoClassName = NSStringFromClass(kvoClass);
     if (![kvoClassName hasPrefix:cz_KVOClassPrefix]) {
@@ -253,7 +252,7 @@ static void cz_kvoSetter(id self, SEL selector, id value) {
     }];
 }
 
-#pragma mark -- 添加方法performSelector传递多个参数的方法方法
+#pragma mark -- 添加方法performSelector传递多个参数的方法
 - (id)performSelector:(SEL)aSelector withObjects:(NSArray *)objects {
     NSMethodSignature *methodSignature = [[self class] instanceMethodSignatureForSelector:aSelector];
     if(methodSignature == nil)
