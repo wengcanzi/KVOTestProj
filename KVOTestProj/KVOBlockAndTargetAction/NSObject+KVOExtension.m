@@ -65,7 +65,10 @@ static NSString * getterString(NSString *setterString){
     // 3.重写KVO类的class方法，指向自定义的IMP。
     Method method = class_getInstanceMethod(object_getClass(self), @selector(class));
     const char *types = method_getTypeEncoding(method);
-    class_addMethod(kvoClass, @selector(class), (IMP)cz_kvoClass, types);
+    //直接添加覆盖
+//    class_addMethod(kvoClass, @selector(class), (IMP)cz_kvoClass, types);
+    //替换selector，返回原来的imp，没有实现则add并返回nil
+    class_replaceMethod(kvoClass, @selector(class), (IMP)cz_kvoClass, types);
     return kvoClass;
 }
 
@@ -140,7 +143,7 @@ static void cz_kvoSetter(id self, SEL selector, id value) {
         object_setClass(self, kvoClass);
     }
     
-    //如果没有实现，则添加Key对应的setter方法。
+    //（指向新创建的类之后，重新添加一次setter）如果没有实现，则添加Key对应的setter方法。
     if (![self cz_hasMethodWithSEL:originalSetter]) {
         class_addMethod(kvoClass, originalSetter, (IMP)cz_kvoSetter, type);
     }
@@ -167,7 +170,7 @@ static void cz_kvoSetter(id self, SEL selector, id value) {
         object_setClass(self, kvoClass);
     }
     
-    //如果没有实现，则添加Key对应的setter方法。
+    //（指向新创建的类之后，重新添加一次setter）如果没有实现，则添加Key对应的setter方法。
     if (![self cz_hasMethodWithSEL:originalSetter]) {
         class_addMethod(kvoClass, originalSetter, (IMP)cz_kvoSetter, type);
     }
@@ -274,7 +277,8 @@ static void cz_kvoSetter(id self, SEL selector, id value) {
             id  obj = objects[i];
             [invocation setArgument:&obj atIndex:i+2];
         }
-        [invocation retainArguments]; //retain所有参数，避免被dealloc
+        //在传入target不是self时需要注意
+//        [invocation retainArguments]; //retain所有参数，避免被dealloc
         [invocation invoke];
         //返回值处理
         id callBackObject = nil;
