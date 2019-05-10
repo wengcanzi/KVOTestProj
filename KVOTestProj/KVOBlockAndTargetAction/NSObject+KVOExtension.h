@@ -7,10 +7,10 @@
 //
 
 #import <Foundation/Foundation.h>
+#import "CZKVOItem.h"
 
 NS_ASSUME_NONNULL_BEGIN
 
-typedef void (^cz_KVOObserveBlock) (NSString *observedKey, id oldValue, id newValue);
 
 @interface NSObject (KVOExtension)
 

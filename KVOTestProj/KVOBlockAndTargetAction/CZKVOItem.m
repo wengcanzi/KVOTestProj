@@ -7,6 +7,7 @@
 //
 
 #import "CZKVOItem.h"
+#import "NSObject+KVOExtension.h"
 
 @implementation CZKVOItem
 

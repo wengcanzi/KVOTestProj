@@ -32,12 +32,13 @@
     [self.object1 description];
     [self.object2 description];
     
-    [self.object1 cz_addObserver:self propertyKey:@"data" action:@selector(valueChange:new:key:)];
-    
     [self.object1 cz_addObserver:self propertyKey:@"data" callback:^(NSString * _Nonnull observedKey, id  _Nonnull oldValue, id  _Nonnull newValue) {
         NSLog(@"old: %@, new: %@ key: %@", oldValue, newValue, observedKey);
         
     }];
+    
+//    [self.object1 cz_addObserver:self propertyKey:@"data" action:@selector(valueChange:new:key:)];
+    
     
     //    [self.object1 cz_addObserver:self originalSelector:@selector(data) callback:^(NSString *observedKey, id oldValue, id newValue) {
     //        NSLog(@"old: %@, new: %@ key: %@", oldValue, newValue, observedKey);

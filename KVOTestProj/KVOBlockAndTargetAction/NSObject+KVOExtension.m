@@ -7,7 +7,6 @@
 //
 
 #import "NSObject+KVOExtension.h"
-#import "CZKVOItem.h"
 #import <objc/runtime.h>
 #import <objc/message.h>
 
@@ -19,7 +18,7 @@ static NSString *cz_KVOClassPrefix = @"cz_KVONotifying_";//系统自动中间类
 @implementation NSObject (KVOExtension)
 
 #pragma mark -- 字符串裁剪
-//c语言的静态函数（作用类似于类方法）
+//c语言的静态函数（作用类似于类方法，函数只能在当前文件使用）
 static NSString * cz_getterForSetter(SEL setter) {
     NSString *setterString = NSStringFromSelector(setter);
     if (![setterString hasPrefix:@"set"]) {
@@ -73,7 +72,8 @@ static NSString * getterString(NSString *setterString){
 }
 
 static Class cz_kvoClass(id self, SEL selector) {
-    return class_getSuperclass(object_getClass(self));
+    Class class = class_getSuperclass(object_getClass(self));
+    return class;
 }
 
 - (BOOL)cz_hasMethodWithSEL:(SEL)sel {
@@ -95,7 +95,8 @@ static Class cz_kvoClass(id self, SEL selector) {
 
 static void cz_kvoSetter(id self, SEL selector, id value) {
     //被观察对象调用setter，执行回调
-    // 1.获取旧值。
+    // 1.获取旧值。 无法直接调用 id objc_msgSend(id self, SEL op, ...)函数原型，需要声明一个函数指针指向它
+    //id oldValue = ((id (*)(id, SEL))(void *)objc_msgSend)(self, getterSelector);
     id (*getterMsgSend) (id, SEL) = (void *)objc_msgSend;
     NSString *getterString = cz_getterForSetter(selector);
     SEL getterSelector = NSSelectorFromString(getterString);
@@ -147,15 +148,26 @@ static void cz_kvoSetter(id self, SEL selector, id value) {
     if (![self cz_hasMethodWithSEL:originalSetter]) {
         class_addMethod(kvoClass, originalSetter, (IMP)cz_kvoSetter, type);
     }
-    //创建观察者item，并动态添加到当前类的容器中    
-    CZKVOItem *item = [[CZKVOItem alloc] initWithObserver:observer key:NSStringFromSelector(originalSelector) action:action];
 
     NSMutableArray<CZKVOItem *> *observers = objc_getAssociatedObject(self, cz_KVOObserverAssociatedKey);
     if (observers == nil) {
         observers = [NSMutableArray array];
+        objc_setAssociatedObject(self, cz_KVOObserverAssociatedKey, observers, OBJC_ASSOCIATION_RETAIN);
     }
-    [observers addObject:item];
-    objc_setAssociatedObject(self, cz_KVOObserverAssociatedKey, observers, OBJC_ASSOCIATION_RETAIN);
+    //创建观察者item，并动态添加到当前类的容器中或者更新回调属性(只保留一种回调)
+    CZKVOItem *item = [[CZKVOItem alloc] initWithObserver:observer key:NSStringFromSelector(originalSelector) action:action];
+    __block BOOL shouldStop = NO;
+    [observers enumerateObjectsUsingBlock:^(CZKVOItem * _Nonnull obj, NSUInteger idx, BOOL * _Nonnull stop) {
+        if ([obj.key isEqualToString:NSStringFromSelector(originalSelector)]) {
+            obj.action = action;
+            obj.block = NULL;
+            shouldStop = YES;
+            *stop = YES;
+        }
+    }];
+    if (!shouldStop) {
+        [observers addObject:item];
+    }
 }
 
 - (void)judgeClass:(Class)kvoClass setterSel:(SEL)originalSetter type:(const char * _Nullable)type observer:(NSObject *)observer originalSel:(SEL)originalSelector callback:(cz_KVOObserveBlock)callback {
@@ -174,14 +186,25 @@ static void cz_kvoSetter(id self, SEL selector, id value) {
     if (![self cz_hasMethodWithSEL:originalSetter]) {
         class_addMethod(kvoClass, originalSetter, (IMP)cz_kvoSetter, type);
     }
-    //创建观察者item，并动态添加到当前类的容器中
-    CZKVOItem *item = [[CZKVOItem alloc] initWithObserver:observer key:NSStringFromSelector(originalSelector) block:callback];
+    //创建观察者item，并动态添加到当前类的容器中(只保留一种回调)
     NSMutableArray<CZKVOItem *> *observers = objc_getAssociatedObject(self, cz_KVOObserverAssociatedKey);
     if (observers == nil) {
         observers = [NSMutableArray array];
+        objc_setAssociatedObject(self, cz_KVOObserverAssociatedKey, observers, OBJC_ASSOCIATION_RETAIN);
     }
-    [observers addObject:item];
-    objc_setAssociatedObject(self, cz_KVOObserverAssociatedKey, observers, OBJC_ASSOCIATION_RETAIN);
+    CZKVOItem *item = [[CZKVOItem alloc] initWithObserver:observer key:NSStringFromSelector(originalSelector) block:callback];
+    __block BOOL shouldStop = NO;
+    [observers enumerateObjectsUsingBlock:^(CZKVOItem * _Nonnull obj, NSUInteger idx, BOOL * _Nonnull stop) {
+        if ([obj.key isEqualToString:NSStringFromSelector(originalSelector)]) {
+            obj.block = callback;
+            obj.action = NULL;
+            shouldStop = YES;
+            *stop = YES;
+        }
+    }];
+    if (!shouldStop) {
+        [observers addObject:item];
+    }
 }
 
 - (void)cz_addObserver:(NSObject *)observer originalSelector:(SEL)originalSelector callback:(cz_KVOObserveBlock)callback {
